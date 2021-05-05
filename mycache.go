@@ -27,7 +27,7 @@ type bucket struct {
 	// 读写锁
 	mu sync.RWMutex
 
-	// 二维数组，存放数据的地方
+	// 二维数组，存放数据的地方，是一个环形链表
 	chunks [][]byte
 
 	// 索引字典
@@ -36,7 +36,7 @@ type bucket struct {
 	// 索引值
 	idx uint64
 
-	// gen is the generation of chunks.
+	// chunks 被重写的次数
 	gen uint64
 }
 
@@ -116,6 +116,8 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	chunkIdx := idx / chunkSize
 	chunkIdxNew := idxNew / chunkSize
 	if chunkIdxNew > chunkIdx {
+		// 校验是否索引已到chunks数组的边界
+		//已到边界，那么循环链表从头开始
 		if chunkIdxNew >= uint64(len(b.chunks)) {
 			idx = 0
 			idxNew = kvLen
@@ -162,8 +164,11 @@ func (b *bucket) Get(dst, k []byte, h uint64, returnDst bool) ([]byte, bool) {
 		gen := v >> bucketSizeBits
 		// 低于bucketSizeBits位置表示idx
 		idx := v & ((1 << bucketSizeBits) - 1)
+		// 这里说明chunks还没被写满
 		if gen == bGen && idx < b.idx ||
+			// 这里说明chunks已被写满，并且当前数据没有被覆盖
 			gen+1 == bGen && idx >= b.idx ||
+			// 这里是边界条件gen已是最大，并且chunks已被写满bGen从1开始，，并且当前数据没有被覆盖
 			gen == maxGen && bGen == 1 && idx >= b.idx {
 			chunkIdx := idx / chunkSize
 			if chunkIdx >= uint64(len(b.chunks)) {

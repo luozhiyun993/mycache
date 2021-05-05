@@ -18,12 +18,14 @@ var (
 
 func getChunk() []byte {
 	freeChunksLock.Lock()
-	if len(freeChunks) == 0 { 
+	if len(freeChunks) == 0 {
+		// 分配  64 * 1024 * 1024 = 64 MB 内存
 		data, err := syscall.Mmap(-1, 0, chunkSize*chunksPerAlloc, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_PRIVATE)
 		if err != nil {
 			panic(fmt.Errorf("cannot allocate %d bytes via mmap: %s", chunkSize*chunksPerAlloc, err))
 		}
 		for len(data) > 0 {
+			//将从系统分配的内存分为 64 * 1024 = 64 KB 大小，存放到 freeChunks中
 			p := (*[chunkSize]byte)(unsafe.Pointer(&data[0]))
 			freeChunks = append(freeChunks, p)
 			data = data[chunkSize:]
