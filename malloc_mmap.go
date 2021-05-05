@@ -1,4 +1,6 @@
-package main
+// +build !appengine,!windows
+
+package mycache
 
 import (
 	"fmt"

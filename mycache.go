@@ -1,4 +1,4 @@
-package main
+package mycache
 
 import (
 	"fmt"
@@ -24,16 +24,16 @@ type Cache struct {
 }
 
 type bucket struct {
+	// 读写锁
 	mu sync.RWMutex
 
-	// chunks is a ring buffer with encoded (k, v) pairs.
-	// It consists of 64KB chunks.
+	// 二维数组，存放数据的地方
 	chunks [][]byte
 
-	// m maps hash(k) to idx of (k, v) pair in chunks.
+	// 索引字典
 	m map[uint64]uint64
 
-	// idx points to chunks for writing the next (k, v) pair.
+	// 索引值
 	idx uint64
 
 	// gen is the generation of chunks.
