@@ -87,14 +87,8 @@ func (c *Cache) Reset() {
 }
 
 func (b *bucket) Set(k, v []byte, h uint64) {
-	//setCalls := atomic.AddUint64(&b.setCalls, 1)
-	//if setCalls%(1<<14) == 0 {
-	//	b.Clean()
-	//}
 	// 限定 k v 大小不能超过 2bytes
 	if len(k) >= (1<<16) || len(v) >= (1<<16) {
-		// Too big key or value - its length cannot be encoded
-		// with 2 bytes (see below). Skip the entry.
 		return
 	}
 	var kvLenBuf [4]byte
