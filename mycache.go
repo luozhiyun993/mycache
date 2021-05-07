@@ -92,6 +92,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	if len(k) >= (1<<16) || len(v) >= (1<<16) {
 		return
 	}
+	// 4个byte 设置每条数据的数据头
 	var kvLenBuf [4]byte
 	kvLenBuf[0] = byte(uint16(len(k)) >> 8)
 	kvLenBuf[1] = byte(len(k))
@@ -100,19 +101,22 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	kvLen := uint64(len(kvLenBuf) + len(k) + len(v))
 	// 校验一下大小
 	if kvLen >= chunkSize {
-		// Do not store too big keys and values, since they do not
-		// fit a chunk.
 		return
 	}
 
 	b.mu.Lock()
+	// 当前索引位置
 	idx := b.idx
+	// 存放完数据后索引的位置
 	idxNew := idx + kvLen
+	// 根据索引找到在 chunks 的位置
 	chunkIdx := idx / chunkSize
 	chunkIdxNew := idxNew / chunkSize
+	// 新的索引是否超过当前索引
+	// 因为还有chunkIdx等于chunkIdxNew情况，所以需要先判断一下
 	if chunkIdxNew > chunkIdx {
-		// 校验是否索引已到chunks数组的边界
-		//已到边界，那么循环链表从头开始
+		// 校验是否新索引已到chunks数组的边界
+		// 已到边界，那么循环链表从头开始
 		if chunkIdxNew >= uint64(len(b.chunks)) {
 			idx = 0
 			idxNew = kvLen
@@ -124,6 +128,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 				b.gen++
 			}
 		} else {
+			// 未到 chunk 的边界
 			idx = chunkIdxNew * chunkSize
 			idxNew = idx + kvLen
 			chunkIdx = chunkIdxNew
