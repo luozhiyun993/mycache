@@ -51,6 +51,7 @@ func (b *bucket) Init(maxBytes uint64) {
 	maxChunks := (maxBytes + chunkSize - 1) / chunkSize
 	b.chunks = make([][]byte, maxChunks)
 	b.m = make(map[uint64]uint64)
+	// 初始化 chunk
 	b.Reset()
 }
 
@@ -133,6 +134,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	chunk := b.chunks[chunkIdx]
 	if chunk == nil {
 		chunk = getChunk()
+		// 清空切片
 		chunk = chunk[:0]
 	}
 	chunk = append(chunk, kvLenBuf[:]...)
@@ -197,10 +199,13 @@ end:
 func (b *bucket) Reset() {
 	b.mu.Lock()
 	chunks := b.chunks
+	// 遍历 chunks
 	for i := range chunks {
+		// 将 chunk 中的内存归还到缓存中
 		putChunk(chunks[i])
 		chunks[i] = nil
 	}
+	// 删除索引字典中所有的数据
 	bm := b.m
 	for k := range bm {
 		delete(bm, k)

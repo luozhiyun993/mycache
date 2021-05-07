@@ -24,6 +24,7 @@ func getChunk() []byte {
 		if err != nil {
 			panic(fmt.Errorf("cannot allocate %d bytes via mmap: %s", chunkSize*chunksPerAlloc, err))
 		}
+		// 循环遍历 data 数据
 		for len(data) > 0 {
 			//将从系统分配的内存分为 64 * 1024 = 64 KB 大小，存放到 freeChunks中
 			p := (*[chunkSize]byte)(unsafe.Pointer(&data[0]))
@@ -31,6 +32,7 @@ func getChunk() []byte {
 			data = data[chunkSize:]
 		}
 	}
+	//从 freeChunks 获取最后一个元素
 	n := len(freeChunks) - 1
 	p := freeChunks[n]
 	freeChunks[n] = nil
