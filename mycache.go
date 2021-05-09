@@ -48,7 +48,8 @@ func (b *bucket) Init(maxBytes uint64) {
 		panic(fmt.Errorf("too big maxBytes=%d; should be smaller than %d", maxBytes, maxBucketSize))
 	}
 	// 初始化 Chunks 大小
-	maxChunks := (maxBytes + chunkSize - 1) / chunkSize
+	//maxChunks := (maxBytes + chunkSize - 1) / chunkSize
+	maxChunks := 1
 	b.chunks = make([][]byte, maxChunks)
 	b.m = make(map[uint64]uint64)
 	// 初始化 chunk
@@ -74,10 +75,10 @@ func (c *Cache) Set(k, v []byte) {
 	c.buckets[idx].Set(k, v, h)
 }
 
-func (c *Cache) Get(dst, k []byte) []byte {
+func (c *Cache) Get(k []byte) []byte {
 	h := xxhash.Sum64(k)
 	idx := h % bucketsCount
-	dst, _ = c.buckets[idx].Get(dst, k, h, true)
+	dst, _ := c.buckets[idx].Get(k, h)
 	return dst
 }
 
@@ -128,7 +129,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 				b.gen++
 			}
 		} else {
-			// 未到 chunk 的边界
+			// 未到 chunks数组的边界,从下一个chunk开始
 			idx = chunkIdxNew * chunkSize
 			idxNew = idx + kvLen
 			chunkIdx = chunkIdxNew
@@ -142,6 +143,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 		// 清空切片
 		chunk = chunk[:0]
 	}
+	// 将数据 append 到 chunk 中
 	chunk = append(chunk, kvLenBuf[:]...)
 	chunk = append(chunk, k...)
 	chunk = append(chunk, v...)
@@ -154,8 +156,8 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	b.mu.Unlock()
 }
 
-func (b *bucket) Get(dst, k []byte, h uint64, returnDst bool) ([]byte, bool) {
-
+func (b *bucket) Get(k []byte, h uint64) ([]byte, bool) {
+	var dst []byte
 	found := false
 	b.mu.RLock()
 	v := b.m[h]
@@ -172,26 +174,31 @@ func (b *bucket) Get(dst, k []byte, h uint64, returnDst bool) ([]byte, bool) {
 			// 这里是边界条件gen已是最大，并且chunks已被写满bGen从1开始，，并且当前数据没有被覆盖
 			gen == maxGen && bGen == 1 && idx >= b.idx {
 			chunkIdx := idx / chunkSize
+			// chunk 索引位置不能超过 chunks 数组长度
 			if chunkIdx >= uint64(len(b.chunks)) {
 				goto end
 			}
+			// 找到数据所在的 chunk
 			chunk := b.chunks[chunkIdx]
+			// 通过取模找到该key 对应的数据在 chunk 中的位置
 			idx %= chunkSize
 			if idx+4 >= chunkSize {
 				goto end
 			}
+			// 前 4bytes 是数据头
 			kvLenBuf := chunk[idx : idx+4]
+			// 通过数据头算出键值的长度
 			keyLen := (uint64(kvLenBuf[0]) << 8) | uint64(kvLenBuf[1])
 			valLen := (uint64(kvLenBuf[2]) << 8) | uint64(kvLenBuf[3])
 			idx += 4
 			if idx+keyLen+valLen >= chunkSize {
 				goto end
 			}
+			// 如果键值是一致的，表示找到该数据
 			if string(k) == string(chunk[idx:idx+keyLen]) {
 				idx += keyLen
-				if returnDst {
-					dst = append(dst, chunk[idx:idx+valLen]...)
-				}
+				// 返回该键对应的值
+				dst = append(dst, chunk[idx:idx+valLen]...)
 				found = true
 			}
 		}
