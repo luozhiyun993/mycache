@@ -26,7 +26,7 @@ func getChunk() []byte {
 		}
 		// 循环遍历 data 数据
 		for len(data) > 0 {
-			//将从系统分配的内存分为 64 * 1024 = 64 KB 大小，存放到 freeChunks中
+			// 将从系统分配的内存分为 64 * 1024 = 64 KB 大小，存放到 freeChunks中
 			p := (*[chunkSize]byte)(unsafe.Pointer(&data[0]))
 			freeChunks = append(freeChunks, p)
 			data = data[chunkSize:]

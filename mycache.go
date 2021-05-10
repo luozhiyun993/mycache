@@ -48,8 +48,7 @@ func (b *bucket) Init(maxBytes uint64) {
 		panic(fmt.Errorf("too big maxBytes=%d; should be smaller than %d", maxBytes, maxBucketSize))
 	}
 	// 初始化 Chunks 大小
-	//maxChunks := (maxBytes + chunkSize - 1) / chunkSize
-	maxChunks := 1
+	maxChunks := (maxBytes + chunkSize - 1) / chunkSize
 	b.chunks = make([][]byte, maxChunks)
 	b.m = make(map[uint64]uint64)
 	// 初始化 chunk
@@ -75,10 +74,10 @@ func (c *Cache) Set(k, v []byte) {
 	c.buckets[idx].Set(k, v, h)
 }
 
-func (c *Cache) Get(k []byte) []byte {
+func (c *Cache) Get(dst, k []byte) []byte {
 	h := xxhash.Sum64(k)
 	idx := h % bucketsCount
-	dst, _ := c.buckets[idx].Get(k, h)
+	dst, _ = c.buckets[idx].Get(dst, k, h, true)
 	return dst
 }
 
@@ -156,8 +155,7 @@ func (b *bucket) Set(k, v []byte, h uint64) {
 	b.mu.Unlock()
 }
 
-func (b *bucket) Get(k []byte, h uint64) ([]byte, bool) {
-	var dst []byte
+func (b *bucket) Get(dst, k []byte, h uint64, returnDst bool) ([]byte, bool) {
 	found := false
 	b.mu.RLock()
 	v := b.m[h]
@@ -198,7 +196,9 @@ func (b *bucket) Get(k []byte, h uint64) ([]byte, bool) {
 			if string(k) == string(chunk[idx:idx+keyLen]) {
 				idx += keyLen
 				// 返回该键对应的值
-				dst = append(dst, chunk[idx:idx+valLen]...)
+				if returnDst {
+					dst = append(dst, chunk[idx:idx+valLen]...)
+				}
 				found = true
 			}
 		}
